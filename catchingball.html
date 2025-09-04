@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Catch the Ball - Win Condition</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+
+    #game {
+      
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      background: url('hill.webp') no-repeat center center/cover;
+      overflow: hidden;
+    }
+
+    .player {
+      position: absolute;
+      bottom: 50px;
+      width: 100px;
+      height: 20px;
+      background: #00ffcc;
+      border-radius: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 3;
+    }
+
+    .ball {
+      position: absolute;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background-color: red;
+      z-index: 3;
+    }
+
+    #scoreboard {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      font-size: 20px;
+      font-weight: bold;
+      text-shadow: 1px 1px 2px black;
+      z-index: 10;
+    }
+
+    #gameOver, #winMessage {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 40px;
+      display: none;
+      z-index: 10;
+      text-align: center;
+    }
+
+    #gameOver {
+      color: red;
+    }
+
+    #winMessage {
+      color: whitesmoke;
+      font-weight: bold;
+      text-shadow: 0 0 20px whitesmoke, 0 0 30px whitesmoke;
+      animation: pulse 1s infinite ease-in-out;
+    }
+
+    @keyframes pulse {
+      0% { transform: translate(-50%, -50%) scale(1); }
+      50% { transform: translate(-50%, -50%) scale(1.1); }
+      100% { transform: translate(-50%, -50%) scale(1); }
+    }
+
+    .cloud {
+      position: absolute;
+      width: 100px;
+      height: 60px;
+      background: #fff;
+      border-radius: 50%;
+      opacity: 0.8;
+      animation: cloudMove 60s linear infinite;
+      top: 50px;
+    }
+
+    .cloud::before,
+    .cloud::after {
+      content: '';
+      position: absolute;
+      background: #fff;
+      border-radius: 50%;
+    }
+
+    .cloud::before {
+      width: 60px;
+      height: 60px;
+      left: -30px;
+      top: 0;
+    }
+
+    .cloud::after {
+      width: 60px;
+      height: 60px;
+      left: 60px;
+      top: 0;
+    }
+
+    @keyframes cloudMove {
+      0% { left: -200px; }
+      100% { left: 100vw; }
+    }
+
+    .bird {
+      position: absolute;
+      top: 100px;
+      left: -100px;
+      width: 80px;
+      height: 80px;
+      background: url('bird1.webp') no-repeat center/contain;
+      animation: birdFly 25s linear infinite;
+      z-index: 2;
+    }
+
+    @keyframes birdFly {
+      0% { left: -100px; }
+      100% { left: 120vw; }
+    }
+
+    /*.lake {
+      position: absolute;
+      bottom: 0;
+      width: 100%;
+      height: 100px;
+      background: radial-gradient(#00bfff, #0066cc);
+      animation: lakeWave 2s ease-in-out infinite alternate;
+      z-index: 1;
+    } */
+
+    @keyframes lakeWave {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(10px); }
+    }
+
+    .tree {
+      position: absolute;
+      bottom: 90px;
+      width: 80px;
+      height: 120px;
+      background: url('tree.webp') no-repeat center/contain;
+      animation: treeSway 4s ease-in-out infinite alternate;
+      z-index: 1;
+    }
+
+    @keyframes treeSway {
+      0% { transform: rotate(-1deg); }
+      100% { transform: rotate(1deg); }
+    }
+  </style>
+</head>
+<body>
+  <div id="game">
+    <!-- Decorations -->
+    <div class="cloud" style="top: 60px;"></div>
+    <div class="cloud" style="top: 120px; animation-delay: 20s;"></div>
+    <div class="bird"></div>
+    <div class="lake"></div>
+    <div class="tree" style="left: 20px;"></div>
+    <div class="tree" style="right: 20px;"></div>
+
+    <!-- Game UI -->
+    <div id="scoreboard">Caught: 0 | Missed: 0</div>
+    <div class="player" id="player"></div>
+    <div id="gameOver">Game Over</div>
+    <div id="winMessage"> Congratulations!<br>You Win! </div>
+  </div>
+
+  <script>
+    const game = document.getElementById('game');
+    const player = document.getElementById('player');
+    const scoreboard = document.getElementById('scoreboard');
+    const gameOver = document.getElementById('gameOver');
+    const winMessage = document.getElementById('winMessage');
+
+    let caught = 0;
+    let missed = 0;
+    let gameRunning = true;
+
+    const maxMissed = 10;
+    const winCatch = 10;
+
+    // Initial player position
+    let playerX = window.innerWidth / 2 - 50;
+    player.style.left = playerX + 'px';
+
+    // Keyboard control
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') {
+        playerX = Math.max(0, playerX - 30);
+      } else if (e.key === 'ArrowRight') {
+        playerX = Math.min(window.innerWidth - 100, playerX + 30);
+      }
+      player.style.left = `${playerX}px`;
+    });
+
+    // Create ball
+    function spawnBall() {
+      const ball = document.createElement('div');
+      ball.classList.add('ball');
+      const startX = Math.random() * (window.innerWidth - 30);
+      ball.style.left = `${startX}px`;
+      ball.style.top = '0px';
+      ball.style.backgroundColor = getRandomColor();
+      game.appendChild(ball);
+
+      let ballY = 0;
+      const fallInterval = setInterval(() => {
+        if (!gameRunning) {
+          clearInterval(fallInterval);
+          ball.remove();
+          return;
+        }
+
+        ballY += 5;
+        ball.style.top = `${ballY}px`;
+
+        const ballRect = ball.getBoundingClientRect();
+        const playerRect = player.getBoundingClientRect();
+
+        if (
+          ballRect.bottom >= playerRect.top &&
+          ballRect.left < playerRect.right &&
+          ballRect.right > playerRect.left
+        ) {
+          caught++;
+          updateScore();
+          clearInterval(fallInterval);
+          ball.remove();
+
+          if (caught >= winCatch) {
+            winGame();
+          }
+        } else if (ballY > window.innerHeight) {
+          missed++;
+          updateScore();
+          clearInterval(fallInterval);
+          ball.remove();
+          if (missed >= maxMissed) {
+            endGame();
+          }
+        }
+      }, 20);
+    }
+
+    function updateScore() {
+      scoreboard.innerText = `Caught: ${caught} | Missed: ${missed}`;
+    }
+
+    function endGame() {
+      gameRunning = false;
+      gameOver.style.display = 'block';
+    }
+
+    function winGame() {
+      gameRunning = false;
+      winMessage.style.display = 'block';
+    }
+
+    function getRandomColor() {
+      const colors = ['#ff4d4d', '#4dff4d', '#4d4dff', '#ffff4d', '#ff4dff'];
+      return colors[Math.floor(Math.random() * colors.length)];
+    }
+
+    // Start ball spawner
+    setInterval(() => {
+      if (gameRunning) {
+        spawnBall();
+      }
+    }, 1000);
+  </script>
+</body>
+</html>
